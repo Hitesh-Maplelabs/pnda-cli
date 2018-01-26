@@ -143,6 +143,10 @@ pnda.archive_container: '$PNDA_ARCHIVE_CONTAINER'
 pnda.archive_type: 's3a'
 pnda.archive_service: ''
 
+spark_metrics:
+  spark_metrics_sink_ip: '$SPARK_METRICS_SINK_IP'
+  spark_metrics_port: '$SPARK_METRICS_PORT'
+
 pnda_mirror:
   base_url: '$PNDA_MIRROR'
   misc_packages_path: /mirror_misc/

@@ -123,6 +123,15 @@ hadoop:
   # - CDH
   HADOOP_DISTRO: CDH
 
+spark_metrics:
+  # Optional SPARK_METRICS_SINK_IP. 
+  # By default PNDA cluster is configured to sink Spark Metrics to Graphite DB in edge node.
+  # Optionally Users can specify this sink to be to an external server accessible to PNDA cluster.
+  SPARK_METRICS_SINK_IP: ''
+  # Spark Metrics sink will use this Port number to send metrics data
+  # port number is ignored, if SPARK_METRICS_SINK_IP is omitted and will use port 2003
+  SPARK_METRICS_PORT: 2003
+
 elk-cluster:
   # number of master nodes
   MASTER_NODES: 0
