@@ -245,4 +245,15 @@ kafka:
 EOF
 fi
 
+cat << EOF >> /srv/salt/platform-salt/pillar/env_parameters.sls
+hadoop_components_version:
+   hbase: $HBASE
+   hdfs: $HDFS
+   hive: $HIVE
+   oozie: $OOZIE
+   spark: $SPARK
+   spark2: $SPARK2
+   yarn: $YARN
+EOF
+
 /tmp/saltmaster-gen-keys.sh

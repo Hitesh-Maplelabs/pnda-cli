@@ -27,6 +27,7 @@ import tarfile
 import Queue
 import StringIO
 import glob
+import xml.etree.ElementTree as ET
 
 from threading import Thread
 
@@ -264,6 +265,10 @@ class BaseBackend(object):
 
     def _set_up_env_conf(self):
         self._write_pnda_env_sh(self._cluster)
+        # Write hadoop components in pnda_env file
+        if self._pnda_env['hadoop']['HADOOP_DISTRO'] == 'HDP':
+            self._write_components_version(self._pnda_env['mirrors']['PNDA_MIRROR'],
+                                       self._cluster)
         self._ssh_client.write_ssh_config(self._get_bastion_ip(),
                                           self._pnda_env['infrastructure']['OS_USER'],
                                           os.path.abspath(self._keyfile))
@@ -277,6 +282,56 @@ class BaseBackend(object):
                         val = '"%s"' % self._pnda_env[section][setting] if isinstance(
                             self._pnda_env[section][setting], (list, tuple)) else self._pnda_env[section][setting]
                         pnda_env_sh_file.write('export %s=%s\n' % (setting, val))
+
+    def _write_components_version(self, mirror, cluster):
+        manifest_file = self._get_hdp_manifest_file(mirror)
+        components = self._hdp_components_version(manifest_file)
+        if components:
+            for component in components:
+                with open('cli/pnda_env_%s.sh' % cluster, 'a') as pnda_env_sh_file:
+                    pnda_env_sh_file.write('export %s=%s\n' % (component, components[component]))
+
+    def _hdp_components_version(self, manifest_file):
+        components_version = dict()
+        response = requests.get(manifest_file)
+        if response.status_code == 200:
+            root = ET.fromstring(response.content)
+            for child in root:
+                if child.tag == 'manifest':
+                    for attr in child:
+                        components_version[attr.attrib.get('name', 'default')] = attr.attrib.get('version', '')
+                    break
+        return components_version
+
+    def _get_hdp_manifest_file(self, mirror):
+        # Fetch salt details from pnda_env.yaml file
+        if 'PLATFORM_SALT_LOCAL' in self._pnda_env['platform_salt']:
+            salt_repo = "%s/pillar/services.sls" % (self._pnda_env['platform_salt']['PLATFORM_SALT_LOCAL'])
+            with open(salt_repo, 'r') as data:
+                key_value = yaml.load(data)
+                hdp_version_key = key_value.get('hdp', '')
+                if hdp_version_key:
+                    hdp_version =hdp_version_key.get('version', '')
+                    if not hdp_version:
+                        CONSOLE.error("Not able to fetch hdp version from platform satl repo")
+                        sys.exit(1)
+                else:
+                    CONSOLE.error("Not able to fetch hdp version from platform satl repo")
+                    sys.exit(1)
+        else:
+            git_repo_url = self._pnda_env['platform_salt']['PLATFORM_GIT_REPO_URI']
+            user_name = git_repo_url.split('/')[-2]
+            salt_repo = "https://raw.githubusercontent.com/%s/platform-salt/%s/pillar/services.sls" %\
+                        (user_name, self._pnda_env['platform_salt']['PLATFORM_GIT_BRANCH'])
+            response = requests.get(salt_repo)
+            if response.status_code == 200:
+                data = yaml.load(response.text)
+                hdp_version = data['hdp']['version']
+            else:
+                CONSOLE.error("Not able to fetch hdp version from platform satl repo")
+                sys.exit(1)
+
+        return "%s%s%s/HDP-%s-MAINT.xml" %(mirror, "/mirror_hdp/HDP/centos7/", hdp_version, hdp_version)
 
     def _bootstrap(self, instance, saltmaster, cluster, flavor, branch,
                    salt_tarball, certs_tarball, error_queue,
